@@ -15,4 +15,4 @@ subchannels:
     - onefile
     - folder
 
-name_format: test-{version}-{arch}-{struct}
+name_format: test-[version]-[arch]-[struct].zip

@@ -2,6 +2,7 @@ import httpx
 import base64
 import json
 import yaml
+import time
 from loguru import logger
 
 VERSION = "0.1"
@@ -54,6 +55,7 @@ class UpdateHelper:
             else:
                 self.__get_metadata(f"https://api.github.com/repos/{self.gh_repo}/contents/fuh_metadata.yaml")
         if firefly:
+            # 欸嘿嘿嘿嘿嘿嘿嘿嘿嘿嘿
             print("""
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
     @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -125,9 +127,13 @@ class UpdateHelper:
             self.metadata = yaml.load(self.metadata,Loader=yaml.FullLoader)
             logger.debug(self.metadata)
             logger.success("拉取元数据完成")
-        elif resp.status_code == 429:
+        elif resp.status_code == 403:
             logger.debug(resp.headers)
             logger.error(f"遇到GitHub API速率限制，请稍后再试")
+            response = httpx.get('https://api.github.com/users/octocat')
+            reset_time = response.headers.get('X-RateLimit-Reset')
+            reset_time = int(reset_time)
+            logger.error(f"重置时间：{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(reset_time))}")
         else:
             logger.error(f"元数据拉取失败，错误码{resp.status_code}")
 
@@ -147,12 +153,40 @@ class UpdateHelper:
             "newer_version":str|None # 更新版本的版本号，若不存在更新版本则为None
         }
         """
-        if enforce_update:
-            self.__get_metadata(self.metadata_url)
+        try:
+            if enforce_update:
+                self.__get_metadata(self.metadata_url)
 
-        if self.current_ver_no < self.metadata["latest_no"][self.current_channel]:
-            return{"newer_exists":True,"newer_version":self.metadata["latest"][self.current_channel]}
+            if self.current_ver_no < self.metadata["latest_no"][self.current_channel]:
+                return {"newer_exists":True,"newer_version":self.metadata["latest"][self.current_channel]}
+            else:
+                return {"newer_exists":False,"newer_version":None}
+        except KeyError:
+            logger.error("无效的频道名称（未在元数据中声明）")
+            return {"newer_exists":False,"newer_version":None}
+        
+    def download_latest(self,path:str):
+        """
+        下载最新版
+        
+        params:
+
+        - path str 下载文件的路径
+        """
+        if self.working_mode == "github":
+            name_struct = self.metadata["name_format"]
+            name_struct.replace(f"[version]",self.metadata["latest"][self.current_channel])
+            for i in self.metadata["subchannels"].keys():
+                name_struct.replace(f"[{i}]",self.current_subchannel[i])
+            url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
+
+            with open(path,"wb+") as f:
+                # （一把抓住self.gh_repo,self.metadata["latest"][self.current_channel],filename）超级拼装！
+                with httpx.stream('GET',url,verify=False) as response:
+                    for chunk in response.iter_bytes():
+                        f.write(chunk)
+                logger.info("meow")
 
 if __name__ == "__main__":
-    uh = UpdateHelper("github","LHGS-github/FireflyUpdateHelper",current_channel="release")
-    uh.compare_latest()
+    uh = UpdateHelper("github","LHGS-github/FireflyUpdateHelper",current_channel="release",current_subchannel={"arch":"x64","struct":"onefile"},current_version="0.1",current_ver_no=1)
+    uh.download_latest("latest.gif")
