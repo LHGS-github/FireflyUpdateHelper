@@ -40,6 +40,16 @@ class UpdateHelper:
         - metadata_url str 元数据的直链位置，设置此参数后会从该位置拉取清单文件，仅对GitHub模式生效
 
         - firefly bool 设为True时打印一张字符画，生产环境不建议开启
+
+        value:
+        - self.download_progress dict 下载进度，结构如下：
+        {
+            "current":int 已下载byte,
+            "total":int 总byte,
+            "percent":int 下载百分比
+        }
+
+        - self.current_channel str 改变此变量的值可以修改频道
         """
         self.working_mode = working_mode
         self.gh_repo = gh_repo
@@ -175,6 +185,7 @@ class UpdateHelper:
 
         - path str 下载文件的路径
         """
+        self.__get_metadata(self.metadata_url)
         if self.working_mode == "github":
             name_struct = self.metadata["name_format"]
             name_struct = name_struct.replace(f"[version]",self.metadata["latest"][self.current_channel])
@@ -182,9 +193,9 @@ class UpdateHelper:
                 name_struct = name_struct.replace(f"[{i}]",self.current_subchannel[i])
             url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
             logger.debug(name_struct)
-            wget.download(url=url,out=path)
+            wget.download(url=url,out=path,bar=self.__progress_recall)
 
-    def __progress_recall(self,current,total):
+    def __progress_recall(self,current,total,width):
         """
         处理wget进度回调，不应该被外部调用
         """
@@ -193,3 +204,4 @@ class UpdateHelper:
 if __name__ == "__main__":
     uh = UpdateHelper("github","LHGS-github/FireflyUpdateHelper",current_channel="release",current_subchannel={"arch":"x64","struct":"onefile"},current_version="0.1",current_ver_no=1)
     uh.download_latest("latest.zip")
+    print(uh.download_progress)
