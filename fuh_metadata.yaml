@@ -1,0 +1,14 @@
+latest:
+  release: v0.1
+  develop: v0.2
+
+subchannels:
+  arch:
+    - x86
+    - x64
+    - armv7a
+  struct:
+    - onefile
+    - folder
+
+name_format: test-{version}-{arch}-{struct}
