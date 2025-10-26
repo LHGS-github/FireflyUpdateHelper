@@ -2,6 +2,10 @@ latest:
   release: v0.1
   develop: v0.2
 
+latest_no:
+  release: 1
+  develop: 2
+
 subchannels:
   arch:
     - x86

@@ -1,12 +1,18 @@
 import httpx
+import base64
+import json
+import yaml
 from loguru import logger
 
 VERSION = "0.1"
 class UpdateHelper:
     def __init__(self,working_mode:str="github"
                 ,gh_repo:str="user/repo"
+                ,gh_mirror:str=None
                 ,current_subchannel:dict={}
                 ,current_channel:str="default"
+                ,current_version:str="v0.0"
+                ,current_ver_no:int=0
                 ,metadata_url:str=None
                 ,firefly:bool=False):
         """
@@ -19,6 +25,12 @@ class UpdateHelper:
 
         - gh_repo str 从GitHub拉取时，拉取的目标仓库（格式：user/repo，例如LHGS_github/FireflyUpdateHelper）
 
+        - gh_mirror str GitHub镜像，要求其可以通过替换原始GitHub URL使用
+
+        - current_version str 当前版本号
+
+        - current_ver_no int 当前内部版本号
+
         - current_subchannel dict 当前子频道，具体内容取决于清单文件
 
         - current_channel str 当前频道，具体内容取决于清单文件
@@ -29,14 +41,18 @@ class UpdateHelper:
         """
         self.working_mode = working_mode
         self.gh_repo = gh_repo
+        self.current_version = current_version
+        self.current_ver_no = current_ver_no
         self.current_subchannel = current_subchannel
         self.current_channel = current_channel
         logger.info(f"Firefly Update Helper Version {VERSION}")
         logger.info(f"工作模式：{self.working_mode}，当前频道：{self.current_channel}，当前子频道：{self.current_subchannel}")
-        logger.info("正在拉取元数据...")
+        logger.info("「流华易逝，萤烛常恒」")
         if self.working_mode == "github":
             if metadata_url:
-                self.get_metadata(metadata_url)
+                self.__get_metadata(metadata_url)
+            else:
+                self.__get_metadata(f"https://api.github.com/repos/{self.gh_repo}/contents/fuh_metadata.yaml")
         if firefly:
             print("""
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -90,8 +106,53 @@ class UpdateHelper:
     @@@@@@@@@@*-+@%%%%%#%%*.#####%@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%####### +@@@@@@@@@@@@@%%@-+@@@
     %%%%%%%%#-:*#*********.=*****#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#******* =################*.%%#
     """)
+        logger.success("Firefly Update Helper初始化完成！")
 
-    def get_metadata(self,metadata_url:str=None):
-        resp = httpx.get(metadata_url)
-        resp.encoding = resp.charset_encoding
-        logger.debug(resp)
+    def __get_metadata(self,metadata_url:str=None):
+        """
+        拉取元数据，不应该被外部调用
+        """
+        self.metadata_url = metadata_url
+        logger.info("正在拉取元数据...")
+        headers = {
+            "content-type":"application/json",
+            "User-Agent": "FireflyUpdateHelper"
+        }
+        resp = httpx.get(metadata_url,verify=False,headers=headers)
+        if resp.status_code == 200:
+            resp.encoding = resp.charset_encoding
+            self.metadata = base64.b64decode(json.loads(resp.text)["content"]).decode("utf-8")
+            self.metadata = yaml.load(self.metadata,Loader=yaml.FullLoader)
+            logger.debug(self.metadata)
+            logger.success("拉取元数据完成")
+        elif resp.status_code == 429:
+            logger.debug(resp.headers)
+            logger.error(f"遇到GitHub API速率限制，请稍后再试")
+        else:
+            logger.error(f"元数据拉取失败，错误码{resp.status_code}")
+
+    def compare_latest(self,enforce_update:bool=False):
+        """
+        比较当前版本和当前频道最新版
+
+        params:
+
+        - enforce_update bool 是否强制更新元数据，如果为False则使用上次更新的元数据比较
+
+        return:
+
+        一个字典。
+        {
+            "newer_exists":bool # 是否存在更新版本
+            "newer_version":str|None # 更新版本的版本号，若不存在更新版本则为None
+        }
+        """
+        if enforce_update:
+            self.__get_metadata(self.metadata_url)
+
+        if self.current_ver_no < self.metadata["latest_no"][self.current_channel]:
+            return{"newer_exists":True,"newer_version":self.metadata["latest"][self.current_channel]}
+
+if __name__ == "__main__":
+    uh = UpdateHelper("github","LHGS-github/FireflyUpdateHelper",current_channel="release")
+    uh.compare_latest()
