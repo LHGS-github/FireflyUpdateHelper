@@ -7,7 +7,8 @@ setup(
     install_requires=[
         "httpx",
         "loguru",
-        "pyyaml"
+        "pyyaml",
+        "wget"
     ],
     author='灵魂歌手er',
     author_email='340994706@qq.com',

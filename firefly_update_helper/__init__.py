@@ -3,6 +3,7 @@ import base64
 import json
 import yaml
 import time
+import wget
 from loguru import logger
 
 VERSION = "0.1"
@@ -46,6 +47,7 @@ class UpdateHelper:
         self.current_ver_no = current_ver_no
         self.current_subchannel = current_subchannel
         self.current_channel = current_channel
+        self.download_progress = {"current":0,"total":0,"percent":0}
         logger.info(f"Firefly Update Helper Version {VERSION}")
         logger.info(f"工作模式：{self.working_mode}，当前频道：{self.current_channel}，当前子频道：{self.current_subchannel}")
         logger.info("「流华易逝，萤烛常恒」")
@@ -175,18 +177,19 @@ class UpdateHelper:
         """
         if self.working_mode == "github":
             name_struct = self.metadata["name_format"]
-            name_struct.replace(f"[version]",self.metadata["latest"][self.current_channel])
+            name_struct = name_struct.replace(f"[version]",self.metadata["latest"][self.current_channel])
             for i in self.metadata["subchannels"].keys():
-                name_struct.replace(f"[{i}]",self.current_subchannel[i])
+                name_struct = name_struct.replace(f"[{i}]",self.current_subchannel[i])
             url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
+            logger.debug(name_struct)
+            wget.download(url=url,out=path)
 
-            with open(path,"wb+") as f:
-                # （一把抓住self.gh_repo,self.metadata["latest"][self.current_channel],filename）超级拼装！
-                with httpx.stream('GET',url,verify=False) as response:
-                    for chunk in response.iter_bytes():
-                        f.write(chunk)
-                logger.info("meow")
+    def __progress_recall(self,current,total):
+        """
+        处理wget进度回调，不应该被外部调用
+        """
+        self.download_progress = {"current":current,"total":total,"percent":(current/total)*100}
 
 if __name__ == "__main__":
     uh = UpdateHelper("github","LHGS-github/FireflyUpdateHelper",current_channel="release",current_subchannel={"arch":"x64","struct":"onefile"},current_version="0.1",current_ver_no=1)
-    uh.download_latest("latest.gif")
+    uh.download_latest("latest.zip")
