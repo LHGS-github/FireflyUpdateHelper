@@ -7,6 +7,10 @@ import wget
 from loguru import logger
 
 VERSION = "0.1"
+class UpdateException(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
+
 class UpdateHelper:
     def __init__(self,working_mode:str="github"
                 ,gh_repo:str="user/repo"
@@ -58,6 +62,7 @@ class UpdateHelper:
         self.current_subchannel = current_subchannel
         self.current_channel = current_channel
         self.download_progress = {"current":0,"total":0,"percent":0}
+        self.gh_mirror = gh_mirror
         logger.info(f"Firefly Update Helper Version {VERSION}")
         logger.info(f"工作模式：{self.working_mode}，当前频道：{self.current_channel}，当前子频道：{self.current_subchannel}")
         logger.info("「流华易逝，萤烛常恒」")
@@ -146,8 +151,10 @@ class UpdateHelper:
             reset_time = response.headers.get('X-RateLimit-Reset')
             reset_time = int(reset_time)
             logger.error(f"重置时间：{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(reset_time))}")
+            raise UpdateException("遇到GitHub API速率限制")
         else:
             logger.error(f"元数据拉取失败，错误码{resp.status_code}")
+            raise UpdateException(f"元数据拉取失败，错误码{resp.status_code}")
 
     def compare_latest(self,enforce_update:bool=False):
         """
@@ -175,7 +182,7 @@ class UpdateHelper:
                 return {"newer_exists":False,"newer_version":None}
         except KeyError:
             logger.error("无效的频道名称（未在元数据中声明）")
-            return {"newer_exists":False,"newer_version":None}
+            raise UpdateException("无效的频道名称（未在元数据中声明）")
         
     def download_latest(self,path:str):
         """
@@ -191,7 +198,10 @@ class UpdateHelper:
             name_struct = name_struct.replace(f"[version]",self.metadata["latest"][self.current_channel])
             for i in self.metadata["subchannels"].keys():
                 name_struct = name_struct.replace(f"[{i}]",self.current_subchannel[i])
-            url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
+            if self.gh_mirror:
+                url = f"https://{self.gh_mirror}/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
+            else:
+                url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
             logger.debug(name_struct)
             wget.download(url=url,out=path,bar=self.__progress_recall)
 
@@ -203,5 +213,3 @@ class UpdateHelper:
 
 if __name__ == "__main__":
     uh = UpdateHelper("github","LHGS-github/FireflyUpdateHelper",current_channel="release",current_subchannel={"arch":"x64","struct":"onefile"},current_version="0.1",current_ver_no=1)
-    uh.download_latest("latest.zip")
-    print(uh.download_progress)
