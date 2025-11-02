@@ -199,9 +199,9 @@ class UpdateHelper:
             for i in self.metadata["subchannels"].keys():
                 name_struct = name_struct.replace(f"[{i}]",self.current_subchannel[i])
             if self.gh_mirror:
-                url = f"https://{self.gh_mirror}/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
+                url = f"https://{self.gh_mirror}/{self.gh_repo}/releases/download/{self.metadata['latest'][self.current_channel]}/{name_struct}"
             else:
-                url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata["latest"][self.current_channel]}/{name_struct}"
+                url = f"https://github.com/{self.gh_repo}/releases/download/{self.metadata['latest'][self.current_channel]}/{name_struct}"
             logger.debug(name_struct)
             wget.download(url=url,out=path,bar=self.__progress_recall)
 
