@@ -150,7 +150,7 @@ class UpdateHelper:
             response = httpx.get('https://api.github.com/users/octocat')
             reset_time = response.headers.get('X-RateLimit-Reset')
             reset_time = int(reset_time)
-            logger.error(f"重置时间：{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(reset_time))}")
+            logger.error(f"重置时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(reset_time))}")
             raise UpdateException("遇到GitHub API速率限制")
         else:
             logger.error(f"元数据拉取失败，错误码{resp.status_code}")
